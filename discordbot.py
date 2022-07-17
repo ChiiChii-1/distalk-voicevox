@@ -32,29 +32,33 @@ async def on_guild_remove(guild):
     presence = f'{prefix}ヘルプ | {len(client.voice_clients)}/{len(client.guilds)}サーバー'
     await client.change_presence(activity=discord.Game(name=presence))
 
+tc = {}
+
 @client.command()
 async def 接続(ctx):
-    if ctx.message.guild:
-        if ctx.author.voice is None:
-            await ctx.send('ボイスチャンネルに接続してから呼び出してください。')
-        else:
-            if ctx.guild.voice_client:
-                if ctx.author.voice.channel == ctx.guild.voice_client.channel:
-                    await ctx.send('接続済みです。')
-                else:
-                    await ctx.voice_client.disconnect()
-                    await asyncio.sleep(0.5)
-                    await ctx.author.voice.channel.connect()
-            else:
-                await ctx.author.voice.channel.connect()
+    guild_id = ctx.guild.id
+    tc_id = ctx.channel.id
+    tc[guild_id] = tc_id
+    await ctx.author.voice.channel.connect()
 
 @client.command()
 async def 切断(ctx):
-    if ctx.message.guild:
-        if ctx.voice_client is None:
-            await ctx.send('ボイスチャンネルに接続していません。')
-        else:
-            await ctx.voice_client.disconnect()
+    guild_id = ctx.guild.id
+    tc.pop(guild_id)
+    await ctx.voice_client.disconnect()
+
+@client.event
+async def on_message(message):
+    if message.guild.voice_client:
+        guild_id = message.author.guild.id
+        if message.channel.id == tc[guild_id]:
+            s_quote = urllib.parse.quote(message.content)
+            mp3url = f'http://translate.google.com/translate_tts?ie=UTF-8&q={s_quote}&tl=ja&client=tw-ob'
+            while message.guild.voice_client.is_playing():
+                await asyncio.sleep(0.5)
+            source = await discord.FFmpegOpusAudio.from_probe(mp3url)
+            message.guild.voice_client.play(source)
+    await client.process_commands(message)
 
 @client.command()
 async def 辞書登録(ctx, *args):
